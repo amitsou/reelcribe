@@ -1,5 +1,7 @@
 # reelcribe
 
+![reelcribe logo](./reelcribe.png)
+
 Handover notes for maintainers and users.
 
 ## Purpose
