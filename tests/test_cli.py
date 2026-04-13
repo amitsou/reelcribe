@@ -1,8 +1,7 @@
 """Tests for reelcribe.cli module."""
 
-import sys
 from pathlib import Path
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -15,11 +14,11 @@ class TestBuildParser:
         args = parser.parse_args(["-i", "/in", "-o", "/out"])
         assert args.input_dir == Path("/in")
         assert args.output_dir == Path("/out")
-        assert args.mode == "transcribe"  # default
+        assert args.mode == "transcribe"
 
     def test_mode_choices(self):
         parser = _build_parser()
-        for mode in ("audio", "transcribe", "full"):
+        for mode in ("audio", "transcribe", "titles", "full"):
             args = parser.parse_args(["-i", "/in", "-o", "/out", "--mode", mode])
             assert args.mode == mode
 
@@ -32,6 +31,11 @@ class TestBuildParser:
         parser = _build_parser()
         args = parser.parse_args(["-i", "/in", "-o", "/out", "--skip-existing"])
         assert args.skip_existing is True
+
+    def test_default_lang(self):
+        parser = _build_parser()
+        args = parser.parse_args(["-i", "/in", "-o", "/out"])
+        assert args.lang == "English"
 
 
 class TestMain:
@@ -54,6 +58,28 @@ class TestMain:
 
         with patch("shutil.which", return_value=None):
             rc = main(["-i", str(in_dir), "-o", str(tmp_path / "out")])
+        assert rc == 1
+
+    def test_returns_1_if_ollama_unreachable_in_titles_mode(self, tmp_path):
+        in_dir = tmp_path / "in"
+        in_dir.mkdir()
+        (in_dir / "clip.mp4").write_bytes(b"fake")
+
+        with patch("shutil.which", return_value="/usr/bin/ffmpeg"):
+            with patch(
+                "reelcribe.cli.verify_ollama_reachable",
+                side_effect=ConnectionError("no server"),
+            ):
+                rc = main(
+                    [
+                        "-i",
+                        str(in_dir),
+                        "-o",
+                        str(tmp_path / "out"),
+                        "-m",
+                        "titles",
+                    ]
+                )
         assert rc == 1
 
     def test_processes_video_files(self, tmp_path):
@@ -110,7 +136,7 @@ class TestProcessFile:
         video = tmp_path / "v.mp4"
         video.write_bytes(b"fake")
 
-        with patch("reelcribe.cli.extract_audio"):
+        with patch("reelcribe.cli.extract_audio") as mock_audio:
             with patch("reelcribe.cli.transcribe", return_value="Hello"):
                 with patch("reelcribe.cli.save_transcript") as mock_save:
                     with patch("reelcribe.cli.generate_title") as mock_title:
@@ -123,8 +149,47 @@ class TestProcessFile:
                             ollama_url="http://localhost:11434/api/generate",
                             skip_existing=False,
                         )
+        mock_audio.assert_called_once()
+        _, wav_arg = mock_audio.call_args[0]
+        assert wav_arg.parent != tmp_path
         mock_save.assert_called_once()
         mock_title.assert_not_called()
+
+    def test_titles_mode_appends_aggregate_file(self, tmp_path):
+        video = tmp_path / "v.mp4"
+        video.write_bytes(b"fake")
+        titles_path = tmp_path / "titles.txt"
+        done: set[str] = set()
+
+        with patch("reelcribe.cli.extract_audio") as mock_audio:
+            with patch("reelcribe.cli.transcribe", return_value="Hello"):
+                with patch("reelcribe.cli.save_transcript") as mock_save:
+                    with patch(
+                        "reelcribe.cli.generate_title", return_value="Title"
+                    ) as mock_title:
+                        with patch("reelcribe.cli.append_title_line") as mock_append:
+                            process_file(
+                                video_path=video,
+                                output_dir=tmp_path,
+                                mode="titles",
+                                whisper_model="base",
+                                ollama_model="llama3",
+                                ollama_url="http://localhost:11434/api/generate",
+                                skip_existing=False,
+                                title_lang="Greek",
+                                titles_txt_path=titles_path,
+                                titles_done=done,
+                            )
+        mock_audio.assert_called_once()
+        mock_save.assert_not_called()
+        mock_title.assert_called_once_with(
+            "Hello",
+            model="llama3",
+            ollama_url="http://localhost:11434/api/generate",
+            language="Greek",
+        )
+        mock_append.assert_called_once_with(titles_path, "v.mp4", "Title")
+        assert "v.mp4" in done
 
     def test_full_mode_generates_title(self, tmp_path):
         video = tmp_path / "v.mp4"
@@ -133,7 +198,9 @@ class TestProcessFile:
         with patch("reelcribe.cli.extract_audio"):
             with patch("reelcribe.cli.transcribe", return_value="Hello"):
                 with patch("reelcribe.cli.save_transcript"):
-                    with patch("reelcribe.cli.generate_title", return_value="Title") as mock_title:
+                    with patch(
+                        "reelcribe.cli.generate_title", return_value="Title"
+                    ) as mock_title:
                         with patch("reelcribe.cli.save_title") as mock_save_title:
                             process_file(
                                 video_path=video,
@@ -145,6 +212,9 @@ class TestProcessFile:
                                 skip_existing=False,
                             )
         mock_title.assert_called_once_with(
-            "Hello", model="llama3", ollama_url="http://localhost:11434/api/generate"
+            "Hello",
+            model="llama3",
+            ollama_url="http://localhost:11434/api/generate",
+            language="English",
         )
         mock_save_title.assert_called_once()

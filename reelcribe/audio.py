@@ -1,4 +1,6 @@
-"""Audio extraction module – converts video files to WAV using ffmpeg."""
+"""FFmpeg-based extraction of WAV audio from video files."""
+
+from __future__ import annotations
 
 import logging
 import shutil
@@ -7,15 +9,23 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-SUPPORTED_VIDEO_EXTENSIONS = {".mp4", ".mov", ".avi", ".mkv", ".webm", ".flv", ".m4v"}
+SUPPORTED_VIDEO_EXTENSIONS = frozenset(
+    {".mp4", ".mov", ".avi", ".mkv", ".webm", ".flv", ".m4v"}
+)
 
 
 def check_ffmpeg() -> None:
-    """Raise RuntimeError if ffmpeg is not found on PATH."""
+    """Verify that the ``ffmpeg`` executable is available on ``PATH``.
+
+    Raises
+    ------
+    RuntimeError
+        If ``ffmpeg`` cannot be found.
+    """
     if shutil.which("ffmpeg") is None:
         raise RuntimeError(
             "ffmpeg was not found on PATH. "
-            "Please install ffmpeg before using reelcribe.\n"
+            "Install ffmpeg before using reelcribe.\n"
             "  Linux:   sudo apt install ffmpeg\n"
             "  macOS:   brew install ffmpeg\n"
             "  Windows: https://ffmpeg.org/download.html"
@@ -23,26 +33,29 @@ def check_ffmpeg() -> None:
 
 
 def extract_audio(video_path: Path, output_path: Path) -> Path:
-    """Extract audio from *video_path* and save as a WAV file at *output_path*.
+    """Decode *video_path* to mono 16 kHz PCM WAV at *output_path*.
+
+    Uses ``ffmpeg`` with PCM signed 16-bit little-endian output, suitable
+    for Whisper transcription.
 
     Parameters
     ----------
     video_path:
-        Path to the source video file.
+        Existing video file to read.
     output_path:
-        Destination path for the extracted WAV file.
+        Destination ``.wav`` path (parent directories are created if needed).
 
     Returns
     -------
     Path
-        The path to the written WAV file.
+        *output_path* after a successful run.
 
     Raises
     ------
-    RuntimeError
-        If ffmpeg is not installed or the extraction fails.
     FileNotFoundError
         If *video_path* does not exist.
+    RuntimeError
+        If *ffmpeg* is missing or exits with an error.
     """
     check_ffmpeg()
 
@@ -53,12 +66,16 @@ def extract_audio(video_path: Path, output_path: Path) -> Path:
 
     cmd = [
         "ffmpeg",
-        "-y",                  # overwrite without asking
-        "-i", str(video_path),
-        "-vn",                 # no video
-        "-acodec", "pcm_s16le",
-        "-ar", "16000",        # 16 kHz sample rate (optimal for Whisper)
-        "-ac", "1",            # mono
+        "-y",
+        "-i",
+        str(video_path),
+        "-vn",
+        "-acodec",
+        "pcm_s16le",
+        "-ar",
+        "16000",
+        "-ac",
+        "1",
         str(output_path),
     ]
 
@@ -83,7 +100,20 @@ def extract_audio(video_path: Path, output_path: Path) -> Path:
 
 
 def find_video_files(input_dir: Path) -> list[Path]:
-    """Return a sorted list of supported video files inside *input_dir*."""
+    """List supported video files in *input_dir* (non-recursive).
+
+    Files are sorted by name. Only direct children of *input_dir* are considered.
+
+    Parameters
+    ----------
+    input_dir:
+        Directory to scan.
+
+    Returns
+    -------
+    list[Path]
+        Paths to files whose suffix is in ``SUPPORTED_VIDEO_EXTENSIONS``.
+    """
     video_files = [
         p
         for p in sorted(input_dir.iterdir())

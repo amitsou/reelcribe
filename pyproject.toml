@@ -5,12 +5,12 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "reelcribe"
 version = "0.1.0"
-description = "Extract audio, transcribe, and generate AI titles from short videos – fully local."
+description = "Extract audio, transcribe with Whisper, optional Ollama titles for short videos (local)."
 readme = "README.md"
 license = { file = "LICENSE" }
 requires-python = ">=3.10"
 dependencies = [
-    "openai-whisper",
+    "openai-whisper>=20231117",
 ]
 
 [project.optional-dependencies]

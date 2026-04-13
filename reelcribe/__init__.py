@@ -1,3 +1,3 @@
-"""reelcribe – extract audio, transcribe, and generate titles from short videos."""
+"""reelcribe: local audio extraction, Whisper transcription, and Ollama-based titles."""
 
 __version__ = "0.1.0"

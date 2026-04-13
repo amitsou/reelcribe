@@ -1,5 +1,18 @@
-# Core dependencies
-openai-whisper
+# reelcribe - Python dependencies for local transcription and optional Ollama titles.
+#
+# Install the CLI from this repo (recommended):
+#   pip install -e .
+# Or install libraries only:
+#   pip install -r requirements.txt
+#
+# System requirements (not installed via pip):
+#   ffmpeg - must be on PATH (audio extraction from video).
+#   Ollama - optional; only for --mode titles or --mode full (local HTTP API).
+#
+# openai-whisper pulls in its own runtime stack (e.g. torch, numpy, numba, tiktoken,
+# tqdm, more-itertools). Use PyTorch install docs if you need a specific CPU/GPU build.
+
+openai-whisper>=20231117
 
 # Development / testing
 pytest>=8
