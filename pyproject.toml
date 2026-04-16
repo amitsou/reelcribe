@@ -5,12 +5,14 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "reelcribe"
 version = "0.1.0"
-description = "Extract audio, transcribe with Whisper, optional Ollama titles for short videos (local)."
+description = "Local video/audio pipeline: Whisper transcription, optional Ollama titles, social image crops. MIT; no paid API keys required."
+keywords = ["whisper", "ollama", "ffmpeg", "transcription", "local-first", "open-source"]
 readme = "README.md"
 license = { file = "LICENSE" }
 requires-python = ">=3.10"
 dependencies = [
     "openai-whisper>=20231117",
+    "Pillow>=10",
 ]
 
 [project.optional-dependencies]
@@ -18,9 +20,17 @@ dev = [
     "pytest>=8",
     "pytest-cov",
 ]
+# MediaPipe 0.10.30+ drops `mediapipe.solutions` (legacy FaceDetection); pin until we migrate to tasks API.
+reels-thumb = [
+    "mediapipe>=0.10.13,<0.10.30",
+    "numpy>=1.24",
+]
 
 [project.scripts]
 reelcribe = "reelcribe.cli:main"
+reelcribe-images = "reelcribe.images_cli:main"
+reelcribe-reels-thumb = "reelcribe.reels_thumb_cli:main"
+reelcribe-thumb-advise = "reelcribe.thumb_advise_cli:main"
 
 [tool.setuptools.packages.find]
 where = ["."]

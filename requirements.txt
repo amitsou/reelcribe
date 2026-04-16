@@ -13,6 +13,7 @@
 # tqdm, more-itertools). Use PyTorch install docs if you need a specific CPU/GPU build.
 
 openai-whisper>=20231117
+Pillow>=10
 
 # Development / testing
 pytest>=8
